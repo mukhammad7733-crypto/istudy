@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Академия — Демо (HTML)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Сглаживание прокрутки таблиц на маленьких экранах */
+    .scroll-shadow { box-shadow: inset -10px 0 8px -8px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50">
+  <div id="app"></div>
+
+  <script>
+    // ===== Demo Data (портировано из вашего React кода) =====
+    const modulesData = [
+      { id: 1, icon: 'brain', title: 'Введение в AI', lessons: ['Понятие AI','История развития','AI vs ML vs DL','Области применения','Generative AI','Практика','Тест'] },
+      { id: 2, icon: 'cpu', title: 'Инструменты AI', lessons: ['Экосистема','LLM модели','Генерация изображений','AI аудио','AI видео','Практика','Тест'] },
+      { id: 3, icon: 'file-spreadsheet', title: 'No-code AI', lessons: ['Работа с файлами','AI-запросы','Автоматизация','Лучшие практики','Кейс','Практика','Тест'] },
+      { id: 4, icon: 'image', title: 'AI изображения', lessons: ['Основы','Редактирование','Расширенные функции','Сравнение','Автоматизация','Практика','Тест'] },
+      { id: 5, icon: 'file-text', title: 'OCR и AI', lessons: ['Что такое OCR','No-code OCR','Сервисы','Продвинутое','Применение','Практика','Тест'] }
+    ];
+
+    const demoUsers = [
+      { id: 1, name: 'Иванов Иван', email: 'ivanov@sqb.uz', progress: { 1: { started: true, completed: 7, total: 7 }, 2: { started: true, completed: 5, total: 7 }, 3: { started: true, completed: 2, total: 7 }, 4: { started: false, completed: 0, total: 7 }, 5: { started: false, completed: 0, total: 7 } }, testResults: [{ moduleId: 1, score: 95, date: '2025-10-10', time: '14:30' }, { moduleId: 2, score: 88, date: '2025-10-14', time: '16:45' }], timeSpent: 780, lastActivity: '2025-10-15', department: 'IT отдел' },
+      { id: 2, name: 'Петрова Анна', email: 'petrova@sqb.uz', progress: { 1: { started: true, completed: 7, total: 7 }, 2: { started: true, completed: 7, total: 7 }, 3: { started: true, completed: 7, total: 7 }, 4: { started: true, completed: 4, total: 7 }, 5: { started: false, completed: 0, total: 7 } }, testResults: [{ moduleId: 1, score: 92, date: '2025-10-08', time: '10:15' }, { moduleId: 2, score: 96, date: '2025-10-11', time: '11:20' }, { moduleId: 3, score: 89, date: '2025-10-13', time: '15:00' }], timeSpent: 1240, lastActivity: '2025-10-16', department: 'Аналитика' },
+      { id: 3, name: 'Каримов Азиз', email: 'karimov@sqb.uz', progress: { 1: { started: true, completed: 3, total: 7 }, 2: { started: false, completed: 0, total: 7 }, 3: { started: false, completed: 0, total: 7 }, 4: { started: false, completed: 0, total: 7 }, 5: { started: false, completed: 0, total: 7 } }, testResults: [], timeSpent: 180, lastActivity: '2025-10-12', department: 'Финансы' },
+      { id: 4, name: 'Сидорова Мария', email: 'sidorova@sqb.uz', progress: { 1: { started: true, completed: 7, total: 7 }, 2: { started: true, completed: 7, total: 7 }, 3: { started: false, completed: 0, total: 7 }, 4: { started: false, completed: 0, total: 7 }, 5: { started: false, completed: 0, total: 7 } }, testResults: [{ moduleId: 1, score: 87, date: '2025-10-09', time: '11:00' }, { moduleId: 2, score: 91, date: '2025-10-12', time: '14:30' }], timeSpent: 620, lastActivity: '2025-10-13', department: 'HR' },
+      { id: 5, name: 'Алимов Рустам', email: 'alimov@sqb.uz', progress: { 1: { started: false, completed: 0, total: 7 }, 2: { started: false, completed: 0, total: 7 }, 3: { started: false, completed: 0, total: 7 }, 4: { started: false, completed: 0, total: 7 }, 5: { started: false, completed: 0, total: 7 } }, testResults: [], timeSpent: 0, lastActivity: '-', department: 'Маркетинг' }
+    ];
+
+    // ===== State =====
+    const state = {
+      isLoggedIn: false,
+      role: null, // 'admin' | 'user'
+      userName: '',
+      view: 'dashboard',
+      users: [...demoUsers],
+      selectedUserId: null,
+      searchQuery: ''
+    };
+
+    // ===== Helpers =====
+    function getOverallProgress(progressMap) {
+      const values = Object.values(progressMap || {});
+      const total = values.reduce((s, m) => s + (m.total || 0), 0);
+      const done = values.reduce((s, m) => s + (m.completed || 0), 0);
+      return total ? Math.round((done / total) * 100) : 0;
+    }
+
+    function minutesToHM(mins) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h}ч ${m}м`;
+    }
+
+    function icon(name, cls='w-5 h-5') {
+      return `<i data-lucide="${name}" class="${cls}"></i>`;
+    }
+
+    // ===== Renders =====
+    function render() {
+      if (!state.isLoggedIn) return renderLogin();
+      if (state.role === 'admin') return renderAdmin();
+      return renderUser();
+    }
+
+    function renderLogin() {
+      document.getElementById('app').innerHTML = `
+        <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
+          <div class="bg-white rounded-xl shadow-xl p-8 max-w-md w-full border border-gray-200">
+            <div class="text-center mb-8">
+              <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-xl mb-4">
+                ${icon('brain','w-10 h-10 text-white')}
+              </div>
+              <h1 class="text-3xl font-bold text-gray-900 mb-2">AI Академия</h1>
+              <p class="text-sm text-gray-600">АКБ «Узпромстройбанк»</p>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input type="email" id="login-email" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="user@sqb.uz" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Пароль</label>
+                <input type="password" id="login-pass" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="••••••••" />
+              </div>
+              <button id="btn-login" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">Войти</button>
+            </div>
+            <div class="mt-6 pt-6 border-t border-gray-200">
+              <p class="text-xs text-gray-500 text-center mb-3">Демо учетные записи:</p>
+              <div class="space-y-2 text-xs text-gray-700">
+                <div class="bg-gray-50 p-2 rounded">admin@sqb.uz - Администратор</div>
+                <div class="bg-gray-50 p-2 rounded">user@sqb.uz - Пользователь</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+      document.getElementById('btn-login').onclick = () => {
+        const email = (document.getElementById('login-email').value || '').toLowerCase();
+        const name = email.split('@')[0] || 'user';
+        state.userName = name;
+        if (email === 'admin@sqb.uz') { state.role = 'admin'; state.view = 'adminUsers'; }
+        else { state.role = 'user'; state.view = 'dashboard'; }
+        state.isLoggedIn = true;
+        render();
+      };
+
+      lucide.createIcons();
+    }
+
+    function renderHeaderAdmin() {
+      return `
+        <header class="bg-white border-b border-gray-200 shadow-sm">
+          <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">${icon('users','w-6 h-6 text-white')}</div>
+                <div>
+                  <h1 class="text-xl font-bold text-gray-900">Админ панель</h1>
+                  <p class="text-xs text-gray-500">Управление платформой</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-sm text-gray-700 font-medium">${state.userName}</span>
+                <button id="btn-logout" class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">${icon('log-out','w-5 h-5')}</button>
+              </div>
+            </div>
+          </div>
+        </header>`;
+    }
+
+    function renderTabs() {
+      const t = (key, label) => `
+        <button data-tab="${key}" class="px-4 py-3 text-sm font-medium border-b-2 ${state.view === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}">${label}</button>`;
+      return `
+        <nav class="bg-white border-b border-gray-200">
+          <div class="max-w-7xl mx-auto px-4">
+            <div class="flex gap-1">
+              ${t('adminUsers','Пользователи')}
+              ${t('adminContent','Контент')}
+              ${t('adminStats','Статистика')}
+            </div>
+          </div>
+        </nav>`;
+    }
+
+    function renderAdmin() {
+      const root = document.getElementById('app');
+      root.innerHTML = renderHeaderAdmin() + renderTabs() + `<main class="max-w-7xl mx-auto px-4 py-8" id="admin-main"></main>`;
+
+      document.getElementById('btn-logout').onclick = () => { state.isLoggedIn = false; state.role = null; render(); };
+      document.querySelectorAll('[data-tab]').forEach(btn => btn.onclick = () => { state.view = btn.getAttribute('data-tab'); state.selectedUserId = null; renderAdmin(); });
+
+      if (state.view === 'adminUsers') renderAdminUsers();
+      if (state.view === 'adminContent') renderAdminContent();
+      if (state.view === 'adminStats') renderAdminStats();
+
+      lucide.createIcons();
+    }
+
+    function filteredUsers() {
+      const q = state.searchQuery.trim().toLowerCase();
+      if (!q) return state.users;
+      return state.users.filter(u =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.department || '').toLowerCase().includes(q)
+      );
+    }
+
+    function renderAdminUsers() {
+      const main = document.getElementById('admin-main');
+      if (!state.selectedUserId) {
+        main.innerHTML = `
+          <div class="space-y-6">
+            <div class="flex justify-between items-center">
+              <div>
+                <h2 class="text-2xl font-bold text-gray-900">Пользователи платформы</h2>
+                <p class="text-gray-600">Прогресс и результаты всех пользователей</p>
+              </div>
+              <button id="btn-export" class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">${icon('download','w-5 h-5')} Экспорт</button>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div class="flex gap-4 mb-4">
+                <div class="flex-1 relative">
+                  ${icon('search','w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2')}
+                  <input type="text" id="user-search" placeholder="Поиск по имени, email или отделу..." value="${state.searchQuery}" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+              </div>
+              <div class="overflow-x-auto scroll-shadow rounded-lg">
+                <table class="w-full">
+                  <thead>
+                    <tr class="border-b border-gray-200 bg-gray-50">
+                      <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Пользователь</th>
+                      <th class="text-center py-3 px-4 text-sm font-semibold text-gray-700">Отдел</th>
+                      <th class="text-center py-3 px-4 text-sm font-semibold text-gray-700">Прогресс</th>
+                      <th class="text-center py-3 px-4 text-sm font-semibold text-gray-700">Тесты</th>
+                      <th class="text-center py-3 px-4 text-sm font-semibold text-gray-700">Время</th>
+                      <th class="text-center py-3 px-4 text-sm font-semibold text-gray-700">Активность</th>
+                      <th class="text-center py-3 px-4 text-sm font-semibold text-gray-700"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${filteredUsers().map(u => {
+                      const progress = getOverallProgress(u.progress);
+                      return `
+                        <tr class="border-b border-gray-100 hover:bg-gray-50">
+                          <td class="py-3 px-4">
+                            <div>
+                              <div class="font-medium text-gray-900">${u.name}</div>
+                              <div class="text-sm text-gray-500">${u.email}</div>
+                            </div>
+                          </td>
+                          <td class="py-3 px-4 text-center"><span class="text-sm text-gray-600">${u.department}</span></td>
+                          <td class="py-3 px-4">
+                            <div class="flex items-center justify-center gap-2">
+                              <div class="w-24 bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full" style="width:${progress}%"></div>
+                              </div>
+                              <span class="text-sm font-medium text-gray-900 w-10">${progress}%</span>
+                            </div>
+                          </td>
+                          <td class="py-3 px-4 text-center"><span class="text-sm text-gray-900">${u.testResults.length}</span></td>
+                          <td class="py-3 px-4 text-center"><span class="text-sm text-gray-900">${minutesToHM(u.timeSpent)}</span></td>
+                          <td class="py-3 px-4 text-center"><span class="text-sm text-gray-600">${u.lastActivity}</span></td>
+                          <td class="py-3 px-4 text-center">
+                            <button data-userid="${u.id}" class="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1 mx-auto">${icon('eye','w-4 h-4')} Подробнее</button>
+                          </td>
+                        </tr>`;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>`;
+
+        document.getElementById('user-search').oninput = (e) => { state.searchQuery = e.target.value; renderAdminUsers(); };
+        document.querySelectorAll('[data-userid]').forEach(btn => btn.onclick = () => { state.selectedUserId = +btn.getAttribute('data-userid'); renderAdminUsers(); });
+        document.getElementById('btn-export').onclick = exportCSV;
+        lucide.createIcons();
+        return;
+      }
+
+      // Детали пользователя
+      const u = state.users.find(x => x.id === state.selectedUserId);
+      const overall = getOverallProgress(u.progress);
+
+      const moduleCards = modulesData.map(m => {
+        const pr = u.progress[m.id] || { completed: 0, total: 0 };
+        const pct = pr.total ? Math.round((pr.completed / pr.total) * 100) : 0;
+        return `
+          <div class="border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center gap-4 mb-3">
+              <div class="bg-blue-100 p-2 rounded-lg">${icon(m.icon,'w-5 h-5 text-blue-600')}</div>
+              <div class="flex-1">
+                <h4 class="font-semibold text-gray-900">${m.title}</h4>
+                <p class="text-sm text-gray-600">${pr.completed} из ${pr.total} уроков</p>
+              </div>
+              <span class="text-lg font-bold text-gray-900">${pct}%</span>
+            </div>
+            <div class="bg-gray-200 rounded-full h-2">
+              <div class="bg-blue-600 h-2 rounded-full" style="width:${pct}%"></div>
+            </div>
+          </div>`;
+      }).join('');
+
+      const resultsTable = u.testResults.length === 0
+        ? `<div class="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">Пользователь еще не проходил тесты</div>`
+        : `
+          <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200">
+                  <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Модуль</th>
+                  <th class="text-center py-3 px-4 text-sm font-semibold text-gray-700">Балл</th>
+                  <th class="text-center py-3 px-4 text-sm font-semibold text-gray-700">Дата</th>
+                  <th class="text-center py-3 px-4 text-sm font-semibold text-gray-700">Время</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${u.testResults.map(r => `
+                  <tr class="border-b border-gray-100 last:border-b-0">
+                    <td class="py-3 px-4 text-sm text-gray-900">${modulesData[r.moduleId - 1].title}</td>
+                    <td class="py-3 px-4 text-center">
+                      <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${r.score >= 90 ? 'bg-green-100 text-green-700' : r.score >= 70 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}">${r.score}%</span>
+                    </td>
+                    <td class="py-3 px-4 text-center text-sm text-gray-600">${r.date}</td>
+                    <td class="py-3 px-4 text-center text-sm text-gray-600">${r.time}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+
+      main.innerHTML = `
+        <div class="space-y-6">
+          <button id="btn-back" class="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2">${icon('chevron-right','w-5 h-5 rotate-180')} Назад к списку</button>
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex justify-between items-start mb-6">
+              <div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-1">${u.name}</h2>
+                <p class="text-gray-600">${u.email}</p>
+                <p class="text-sm text-gray-500 mt-1">${u.department}</p>
+              </div>
+              <div class="text-right">
+                <div class="text-4xl font-bold text-blue-600">${overall}%</div>
+                <div class="text-sm text-gray-600">Общий прогресс</div>
+              </div>
+            </div>
+            <div class="grid md:grid-cols-3 gap-4 mb-6">
+              <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                ${icon('clock','w-8 h-8 text-blue-600 mb-2')}
+                <div class="text-sm text-blue-700">Времени потрачено</div>
+                <div class="text-2xl font-bold text-blue-900">${minutesToHM(u.timeSpent)}</div>
+              </div>
+              <div class="bg-green-50 rounded-lg p-4 border border-green-200">
+                ${icon('check-circle','w-8 h-8 text-green-600 mb-2')}
+                <div class="text-sm text-green-700">Завершено модулей</div>
+                <div class="text-2xl font-bold text-green-900">${Object.values(u.progress).filter(m => m.completed === m.total).length}/5</div>
+              </div>
+              <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                ${icon('calendar','w-8 h-8 text-purple-600 mb-2')}
+                <div class="text-sm text-purple-700">Последняя активность</div>
+                <div class="text-2xl font-bold text-purple-900">${u.lastActivity}</div>
+              </div>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Прогресс по модулям</h3>
+            <div class="space-y-4 mb-6">${moduleCards}</div>
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Результаты тестов</h3>
+            ${resultsTable}
+          </div>
+        </div>`;
+
+      document.getElementById('btn-back').onclick = () => { state.selectedUserId = null; renderAdminUsers(); };
+      lucide.createIcons();
+    }
+
+    function renderAdminContent() {
+      const main = document.getElementById('admin-main');
+      main.innerHTML = `
+        <div class="space-y-6">
+          <h2 class="text-2xl font-bold text-gray-900">Контент</h2>
+          <div class="bg-white border border-gray-200 rounded-lg p-6 text-gray-600">
+            Раздел в разработке. Здесь будет редактор уроков, импорт/экспорт, версии и предпросмотр.
+          </div>
+        </div>`;
+    }
+
+    function renderAdminStats() {
+      const main = document.getElementById('admin-main');
+      const totalUsers = state.users.length;
+      const avgProgress = Math.round(state.users.reduce((s,u)=> s + getOverallProgress(u.progress),0) / totalUsers);
+      const totalTests = state.users.reduce((s,u)=> s + u.testResults.length, 0);
+
+      main.innerHTML = `
+        <div class="space-y-6">
+          <h2 class="text-2xl font-bold text-gray-900">Статистика</h2>
+          <div class="grid md:grid-cols-3 gap-4">
+            <div class="bg-white border border-gray-200 rounded-lg p-6">
+              <div class="text-sm text-gray-600">Пользователей</div>
+              <div class="text-3xl font-bold">${totalUsers}</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-6">
+              <div class="text-sm text-gray-600">Средний прогресс</div>
+              <div class="text-3xl font-bold">${avgProgress}%</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-6">
+              <div class="text-sm text-gray-600">Пройдено тестов</div>
+              <div class="text-3xl font-bold">${totalTests}</div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderUser() {
+      document.getElementById('app').innerHTML = `
+        <div class="min-h-screen bg-gray-50">
+          <header class="bg-white border-b border-gray-200 shadow-sm">
+            <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">${icon('book-open','w-6 h-6 text-white')}</div>
+                <div>
+                  <h1 class="text-xl font-bold text-gray-900">Личный кабинет</h1>
+                  <p class="text-xs text-gray-500">Демо-режим (только HTML)</p>
+                </div>
+              </div>
+              <button id="btn-logout" class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">${icon('log-out','w-5 h-5')}</button>
+            </div>
+          </header>
+          <main class="max-w-5xl mx-auto px-4 py-20 text-center">
+            <h2 class="text-3xl font-bold mb-2">User View — код свёрнут</h2>
+            <p class="text-gray-600">В этой HTML‑версии реализована админ-панель и логин. Для полного пользовательского сценария используйте React‑версию.</p>
+          </main>
+        </div>`;
+      document.getElementById('btn-logout').onclick = () => { state.isLoggedIn = false; state.role = null; render(); };
+      lucide.createIcons();
+    }
+
+    // ===== Export CSV =====
+    function exportCSV() {
+      const rows = [
+        ['id','name','email','department','overall_progress_%','tests','time_spent_min','last_activity']
+      ];
+      filteredUsers().forEach(u => {
+        rows.push([
+          u.id,
+          '"' + u.name + '"',
+          u.email,
+          '"' + (u.department||'') + '"',
+          getOverallProgress(u.progress),
+          u.testResults.length,
+          u.timeSpent,
+          '"' + (u.lastActivity||'') + '"'
+        ]);
+      });
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'users_export.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ===== Start =====
+    render();
+  </script>
+</body>
+</html>
