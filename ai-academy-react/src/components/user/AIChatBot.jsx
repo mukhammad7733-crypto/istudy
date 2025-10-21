@@ -208,7 +208,7 @@ function AIChatBot({ onAgentCreated, onClose, autoOpen = true }) {
             ...prev,
             {
               type: 'bot',
-              text: 'Привет! Теперь я ваш персональный AI агент на базе OpenAI. Чем могу помочь?',
+              text: 'Привет! Теперь я ваш персональный AI ассистент на базе GPT-4 Mini. Чем могу помочь?',
             },
           ]);
           setIsChatMode(true);
