@@ -26,7 +26,7 @@ function AdminStats({ users }) {
 
   // Завершенные модули
   const completedModules = displayUsers.reduce((sum, user) =>
-    sum + Object.values(user.progress).filter(p => p.completed === p.total).length
+    sum + Object.values(user.progress).filter(p => p.completed === p.total && p.total > 0).length
   , 0);
 
   // Средний балл тестов
@@ -38,9 +38,10 @@ function AdminStats({ users }) {
   // Статистика по модулям
   const moduleStats = modulesData.map(module => {
     const usersStarted = displayUsers.filter(u => u.progress[module.id]?.started).length;
-    const usersCompleted = displayUsers.filter(u =>
-      u.progress[module.id]?.completed === u.progress[module.id]?.total
-    ).length;
+    const usersCompleted = displayUsers.filter(u => {
+      const p = u.progress[module.id];
+      return p && p.completed === p.total && p.total > 0;
+    }).length;
     const completionRate = usersStarted > 0
       ? Math.round((usersCompleted / usersStarted) * 100)
       : 0;
@@ -84,7 +85,11 @@ function AdminStats({ users }) {
           email: u.email,
           department: u.department,
           active: Object.values(u.progress).some(p => p.started),
-          progress: getOverallProgress(u.progress)
+          progress: getOverallProgress(u.progress),
+          lastActivity: u.lastActivity || 'Не указано',
+          timeSpent: minutesToHM(u.timeSpent),
+          completedModules: Object.values(u.progress).filter(p => p.completed === p.total && p.total > 0).length,
+          totalModules: Object.keys(u.progress).length
         }));
 
       case 'progress':
@@ -92,7 +97,9 @@ function AdminStats({ users }) {
           name: u.name,
           progress: getOverallProgress(u.progress),
           modules: Object.keys(u.progress).length,
-          completed: Object.values(u.progress).filter(p => p.completed === p.total).length
+          completed: Object.values(u.progress).filter(p => p.completed === p.total && p.total > 0).length,
+          lastActivity: u.lastActivity || 'Не указано',
+          timeSpent: minutesToHM(u.timeSpent)
         }));
 
       case 'tests':
@@ -217,7 +224,7 @@ function AdminStats({ users }) {
           <div className="flex items-center justify-between mb-2 sm:mb-3">
             <Clock className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
             <div className="text-right">
-              <div className="text-2xl sm:text-3xl font-bold">{Math.floor(totalTimeSpent / 60)}ч</div>
+              <div className="text-2xl sm:text-3xl font-bold">{minutesToHM(totalTimeSpent)}</div>
               <div className="text-xs sm:text-sm opacity-80 hidden sm:block">Времени потрачено</div>
               <div className="text-xs opacity-80 sm:hidden">Времени</div>
             </div>
@@ -225,7 +232,7 @@ function AdminStats({ users }) {
           <div className="text-xs sm:text-sm opacity-90 truncate">
             <span className="hidden sm:inline">В среднем: </span>
             <span className="sm:hidden">Срд: </span>
-            {minutesToHM(Math.floor(totalTimeSpent / totalUsers))}
+            {totalUsers > 0 ? minutesToHM(Math.floor(totalTimeSpent / totalUsers)) : '0ч 0м'}
           </div>
           <div className="text-xs opacity-70 mt-2">Нажмите для деталей →</div>
         </button>
@@ -314,22 +321,36 @@ function AdminStats({ users }) {
             <div className="space-y-3">
               {detailModal.type === 'users' && detailModal.data.map((user, idx) => (
                 <div key={idx} className="border border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-gray-900">{user.name}</div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="font-semibold text-gray-900">{user.name}</div>
+                        {user.active ? (
+                          <CheckCircle className="w-5 h-5 text-green-500" title="Активен" />
+                        ) : (
+                          <XCircle className="w-5 h-5 text-gray-400" title="Неактивен" />
+                        )}
+                      </div>
                       <div className="text-sm text-gray-600">{user.email}</div>
                       <div className="text-sm text-gray-500 mt-1">{user.department}</div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-blue-600">{user.progress}%</div>
-                        <div className="text-xs text-gray-500">прогресс</div>
-                      </div>
-                      {user.active ? (
-                        <CheckCircle className="w-6 h-6 text-green-500" />
-                      ) : (
-                        <XCircle className="w-6 h-6 text-gray-400" />
-                      )}
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-blue-600">{user.progress}%</div>
+                      <div className="text-xs text-gray-500">прогресс</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100">
+                    <div>
+                      <div className="text-xs text-gray-500">Модули</div>
+                      <div className="text-sm font-semibold text-gray-900">{user.completedModules}/{user.totalModules}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Время</div>
+                      <div className="text-sm font-semibold text-gray-900">{user.timeSpent}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Активность</div>
+                      <div className="text-sm font-semibold text-gray-900">{user.lastActivity}</div>
                     </div>
                   </div>
                 </div>
@@ -341,11 +362,21 @@ function AdminStats({ users }) {
                     <div className="font-semibold text-gray-900">{user.name}</div>
                     <div className="text-2xl font-bold text-blue-600">{user.progress}%</div>
                   </div>
-                  <div className="flex gap-4 text-sm text-gray-600">
-                    <span>Модулей: {user.modules}</span>
-                    <span>Завершено: {user.completed}</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-gray-600 mb-2">
+                    <div>
+                      <span className="text-gray-500">Модулей:</span> <span className="font-semibold text-gray-900">{user.modules}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Завершено:</span> <span className="font-semibold text-green-600">{user.completed}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Время:</span> <span className="font-semibold text-gray-900">{user.timeSpent}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Активность:</span> <span className="font-semibold text-gray-900">{user.lastActivity}</span>
+                    </div>
                   </div>
-                  <div className="mt-2 bg-gray-200 rounded-full h-2">
+                  <div className="bg-gray-200 rounded-full h-2">
                     <div
                       className="bg-blue-600 h-2 rounded-full transition-all"
                       style={{ width: `${user.progress}%` }}
