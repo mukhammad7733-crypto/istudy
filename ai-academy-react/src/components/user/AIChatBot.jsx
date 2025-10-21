@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bot, X, Send, Sparkles, CheckCircle } from 'lucide-react';
-import { aiAgentQuestions } from '../../data/aiAgentQuestions';
+import { aiAgentQuestions as defaultQuestions } from '../../data/aiAgentQuestions';
 
 function AIChatBot({ onAgentCreated, onClose, autoOpen = true }) {
   const [isOpen, setIsOpen] = useState(autoOpen); // Можно автоматически открыть
@@ -11,18 +11,56 @@ function AIChatBot({ onAgentCreated, onClose, autoOpen = true }) {
   const [isChatMode, setIsChatMode] = useState(false); // Режим обычного чата после создания агента
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [aiAgentQuestions, setAiAgentQuestions] = useState([]);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Загружаем вопросы из localStorage (синхронизация с админкой)
+  useEffect(() => {
+    const loadQuestions = () => {
+      try {
+        const saved = localStorage.getItem('aiAgentQuestions');
+        if (saved) {
+          const savedQuestions = JSON.parse(saved);
+          // Преобразуем формат из админки в формат для чатбота
+          const formatted = savedQuestions.map(q => ({
+            id: q.id,
+            question: q.question,
+            options: q.options.map(opt => opt.option_text)
+          }));
+          setAiAgentQuestions(formatted);
+        } else {
+          // Используем дефолтные вопросы
+          setAiAgentQuestions(defaultQuestions);
+        }
+      } catch (error) {
+        console.error('Error loading AI questions:', error);
+        setAiAgentQuestions(defaultQuestions);
+      }
+    };
+
+    loadQuestions();
+
+    // Обновляем при изменениях в localStorage (когда админ редактирует)
+    const handleStorageChange = (e) => {
+      if (e.key === 'aiAgentQuestions') {
+        loadQuestions();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
+    if (isOpen && messages.length === 0 && aiAgentQuestions.length > 0) {
       // Приветственное сообщение
       setTimeout(() => {
         setMessages([
@@ -32,7 +70,13 @@ function AIChatBot({ onAgentCreated, onClose, autoOpen = true }) {
           },
           {
             type: 'bot',
-            text: 'Я задам вам 10 вопросов, чтобы понять ваши потребности. Готовы начать?',
+            text: `Я задам вам ${aiAgentQuestions.length} ${
+              aiAgentQuestions.length === 1
+                ? 'вопрос'
+                : aiAgentQuestions.length < 5
+                ? 'вопроса'
+                : 'вопросов'
+            }, чтобы понять ваши потребности. Готовы начать?`,
           },
         ]);
       }, 500);

@@ -5,7 +5,13 @@
       "Bash(npm install)",
       "Bash(npm run dev:*)",
       "Bash(npm install:*)",
-      "Read(//d/Developer/ai-academy-backend/**)"
+      "Read(//d/Developer/ai-academy-backend/**)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(vercel --version:*)",
+      "Bash(docker:*)",
+      "Bash(docker-compose:*)"
     ],
     "deny": [],
     "ask": []

@@ -2,6 +2,7 @@ function AdminTabs({ activeView, setActiveView }) {
   const tabs = [
     { key: 'adminUsers', label: 'Пользователи', shortLabel: 'Юзеры' },
     { key: 'adminContent', label: 'Контент', shortLabel: 'Контент' },
+    { key: 'adminAIQuestions', label: 'AI Агент', shortLabel: 'AI' },
     { key: 'adminStats', label: 'Статистика', shortLabel: 'Стат' }
   ];
 

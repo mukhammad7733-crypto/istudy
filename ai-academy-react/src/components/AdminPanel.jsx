@@ -3,6 +3,7 @@ import AdminHeader from './admin/AdminHeader';
 import AdminTabs from './admin/AdminTabs';
 import AdminUsers from './admin/AdminUsers';
 import AdminContent from './admin/AdminContent';
+import AdminAIQuestions from './admin/AdminAIQuestions';
 import AdminStats from './admin/AdminStats';
 
 function AdminPanel({ userName, onLogout, users, setUsers }) {
@@ -18,6 +19,7 @@ function AdminPanel({ userName, onLogout, users, setUsers }) {
           <AdminUsers users={users} setUsers={setUsers} />
         )}
         {activeView === 'adminContent' && <AdminContent users={users} setUsers={setUsers} />}
+        {activeView === 'adminAIQuestions' && <AdminAIQuestions />}
         {activeView === 'adminStats' && <AdminStats users={users} />}
       </main>
     </div>
