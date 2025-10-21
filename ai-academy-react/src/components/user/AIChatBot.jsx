@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bot, X, Send, Sparkles, CheckCircle } from 'lucide-react';
 import { aiAgentQuestions as defaultQuestions } from '../../data/aiAgentQuestions';
+import openAIService from '../../services/openai';
 
 function AIChatBot({ onAgentCreated, onClose, autoOpen = true }) {
   const [isOpen, setIsOpen] = useState(autoOpen); // Можно автоматически открыть
@@ -193,6 +194,9 @@ function AIChatBot({ onAgentCreated, onClose, autoOpen = true }) {
         ]);
         setIsCompleted(true);
 
+        // Инициализируем OpenAI сервис с ответами пользователя
+        openAIService.initializeAgent(newAnswers);
+
         // Вызываем callback для создания агента
         if (onAgentCreated) {
           onAgentCreated(newAnswers);
@@ -204,7 +208,7 @@ function AIChatBot({ onAgentCreated, onClose, autoOpen = true }) {
             ...prev,
             {
               type: 'bot',
-              text: 'Привет! Теперь я ваш персональный AI агент. Чем могу помочь?',
+              text: 'Привет! Теперь я ваш персональный AI агент на базе OpenAI. Чем могу помочь?',
             },
           ]);
           setIsChatMode(true);
@@ -213,48 +217,45 @@ function AIChatBot({ onAgentCreated, onClose, autoOpen = true }) {
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputText.trim()) return;
+
+    const userMessage = inputText;
 
     // Добавляем сообщение пользователя
     setMessages((prev) => [
       ...prev,
       {
         type: 'user',
-        text: inputText,
+        text: userMessage,
       },
     ]);
 
     setInputText('');
     setIsTyping(true);
 
-    // Имитация ответа агента
-    setTimeout(() => {
+    try {
+      // Получаем реальный ответ от OpenAI
+      const response = await openAIService.sendMessage(userMessage);
+
       setIsTyping(false);
       setMessages((prev) => [
         ...prev,
         {
           type: 'bot',
-          text: generateAgentResponse(inputText),
+          text: response,
         },
       ]);
-    }, 1500);
-  };
-
-  const generateAgentResponse = (userMessage) => {
-    // Простая логика ответов на основе ключевых слов
-    const lowerMessage = userMessage.toLowerCase();
-
-    if (lowerMessage.includes('привет') || lowerMessage.includes('здравствуй')) {
-      return 'Здравствуйте! Я готов помочь вам с любыми вопросами.';
-    } else if (lowerMessage.includes('помощь') || lowerMessage.includes('помоги')) {
-      return 'Конечно! Я могу помочь вам с анализом данных, созданием контента, автоматизацией задач и многим другим. Что вас интересует?';
-    } else if (lowerMessage.includes('что ты умеешь') || lowerMessage.includes('возможности')) {
-      return `Я настроен для работы в области "${answers[0]?.answer}". Могу помочь с различными задачами, используя модель ${answers[3]?.answer}. Просто опишите вашу задачу!`;
-    } else if (lowerMessage.includes('спасибо') || lowerMessage.includes('благодарю')) {
-      return 'Всегда рад помочь! Если возникнут еще вопросы - обращайтесь!';
-    } else {
-      return 'Понимаю вас. Я проанализирую ваш запрос и помогу найти решение. Для более точной помощи, можете уточнить детали?';
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setIsTyping(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: 'bot',
+          text: 'Извините, произошла ошибка при обработке вашего сообщения. Пожалуйста, попробуйте снова.',
+        },
+      ]);
     }
   };
 
