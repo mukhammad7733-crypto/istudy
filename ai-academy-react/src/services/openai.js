@@ -1,278 +1,119 @@
-// OpenAI Assistants API Integration Service
-// This service handles all interactions with OpenAI Assistants API
+// OpenAI Chat Completions API Integration Service
+// This service handles all interactions with OpenAI using GPT-4o Mini
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-const ASSISTANT_ID = 'asst_svIGGgaQ1nptzM8lYSep6SgU'; // Your OpenAI Assistant ID
-const OPENAI_API_BASE = 'https://api.openai.com/v1';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
-class OpenAIAssistantService {
+class OpenAIService {
   constructor() {
     this.apiKey = OPENAI_API_KEY;
-    this.assistantId = ASSISTANT_ID;
-    this.threadId = null; // Current conversation thread
+    this.model = 'gpt-4o-mini'; // Fast and cost-effective model
     this.conversationHistory = [];
+    this.systemPrompt = '';
   }
 
   /**
-   * Create a new thread for conversation
-   * @returns {Promise<string>} - Thread ID
+   * Initialize agent with user preferences from questions
+   * @param {Array} userAnswers - Answers from the AI agent creation questions
    */
-  async createThread() {
+  initializeAgent(userAnswers = []) {
     try {
-      const response = await fetch(`${OPENAI_API_BASE}/threads`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-          'OpenAI-Beta': 'assistants=v2'
+      // Extract key information from user answers
+      const area = userAnswers[0]?.answer || 'general assistance';
+      const preferences = userAnswers.map(a => a.answer).join(', ');
+
+      // Create personalized system prompt
+      this.systemPrompt = `You are a helpful AI assistant specialized in ${area}.
+Your primary goal is to help users with tasks and questions related to ${area}.
+User preferences: ${preferences}
+
+Always respond in Russian language since the user interface is in Russian.
+Be friendly, professional, and provide accurate, helpful responses.
+Keep your responses concise and clear.`;
+
+      // Initialize conversation history with system prompt
+      this.conversationHistory = [
+        {
+          role: 'system',
+          content: this.systemPrompt
         }
-      });
+      ];
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to create thread');
-      }
+      console.log('Agent initialized with preferences:', area);
+      return true;
 
-      const data = await response.json();
-      this.threadId = data.id;
-      console.log('Thread created:', this.threadId);
-      return this.threadId;
-
-    } catch (error) {
-      console.error('Error creating thread:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Initialize assistant for a new user
-   * This creates a new thread for the conversation
-   * @param {Array} userAnswers - Optional user answers from agent creation
-   */
-  async initializeAgent(userAnswers = []) {
-    try {
-      await this.createThread();
-
-      // If we have user answers, send them as context
-      if (userAnswers && userAnswers.length > 0) {
-        const contextMessage = this.buildContextFromAnswers(userAnswers);
-        // Send context as first message (optional, depending on your assistant setup)
-        console.log('User context:', contextMessage);
-      }
-
-      return this.threadId;
     } catch (error) {
       console.error('Error initializing agent:', error);
-      throw error;
+      // Fallback to default system prompt
+      this.systemPrompt = 'You are a helpful AI assistant. Always respond in Russian language. Be friendly and professional.';
+      this.conversationHistory = [
+        {
+          role: 'system',
+          content: this.systemPrompt
+        }
+      ];
+      return false;
     }
   }
 
   /**
-   * Build context message from user answers
-   * @param {Array} userAnswers - User answers from questions
-   * @returns {string} - Formatted context
-   */
-  buildContextFromAnswers(userAnswers) {
-    const context = userAnswers.map((ans, idx) =>
-      `Вопрос ${idx + 1}: ${ans.answer}`
-    ).join('\n');
-    return `Контекст пользователя:\n${context}`;
-  }
-
-  /**
-   * Add a message to the thread
+   * Send a message to OpenAI and get response
    * @param {string} message - User's message
-   * @returns {Promise<object>} - Message object
-   */
-  async addMessage(message) {
-    if (!this.threadId) {
-      await this.createThread();
-    }
-
-    try {
-      const response = await fetch(`${OPENAI_API_BASE}/threads/${this.threadId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-          'OpenAI-Beta': 'assistants=v2'
-        },
-        body: JSON.stringify({
-          role: 'user',
-          content: message
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to add message');
-      }
-
-      const data = await response.json();
-      return data;
-
-    } catch (error) {
-      console.error('Error adding message:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create and poll a run
-   * @returns {Promise<object>} - Run result
-   */
-  async createRun() {
-    try {
-      const response = await fetch(`${OPENAI_API_BASE}/threads/${this.threadId}/runs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-          'OpenAI-Beta': 'assistants=v2'
-        },
-        body: JSON.stringify({
-          assistant_id: this.assistantId,
-          model: 'gpt-4o-mini' // Using GPT-4 mini as requested
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to create run');
-      }
-
-      const run = await response.json();
-      return run;
-
-    } catch (error) {
-      console.error('Error creating run:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Poll run status until completion
-   * @param {string} runId - Run ID to poll
-   * @returns {Promise<object>} - Completed run
-   */
-  async pollRunStatus(runId) {
-    const maxAttempts = 60; // 60 seconds timeout
-    let attempts = 0;
-
-    while (attempts < maxAttempts) {
-      try {
-        const response = await fetch(`${OPENAI_API_BASE}/threads/${this.threadId}/runs/${runId}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'OpenAI-Beta': 'assistants=v2'
-          }
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error?.message || 'Failed to get run status');
-        }
-
-        const run = await response.json();
-        console.log('Run status:', run.status);
-
-        if (run.status === 'completed') {
-          return run;
-        } else if (run.status === 'failed' || run.status === 'cancelled' || run.status === 'expired') {
-          throw new Error(`Run ${run.status}: ${run.last_error?.message || 'Unknown error'}`);
-        }
-
-        // Wait 1 second before polling again
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        attempts++;
-
-      } catch (error) {
-        console.error('Error polling run:', error);
-        throw error;
-      }
-    }
-
-    throw new Error('Run timeout: Assistant took too long to respond');
-  }
-
-  /**
-   * Get the latest message from the thread
-   * @returns {Promise<string>} - Assistant's response
-   */
-  async getLatestMessage() {
-    try {
-      const response = await fetch(`${OPENAI_API_BASE}/threads/${this.threadId}/messages?limit=1&order=desc`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'OpenAI-Beta': 'assistants=v2'
-        }
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to get messages');
-      }
-
-      const data = await response.json();
-      const messages = data.data;
-
-      if (messages.length === 0) {
-        throw new Error('No messages found');
-      }
-
-      const latestMessage = messages[0];
-
-      // Extract text from message content
-      if (latestMessage.content && latestMessage.content.length > 0) {
-        const textContent = latestMessage.content.find(c => c.type === 'text');
-        if (textContent) {
-          return textContent.text.value;
-        }
-      }
-
-      throw new Error('No text content found in message');
-
-    } catch (error) {
-      console.error('Error getting latest message:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Send a message and get response from assistant
-   * @param {string} message - User's message
-   * @returns {Promise<string>} - Assistant's response
+   * @returns {Promise<string>} - AI's response
    */
   async sendMessage(message) {
     try {
-      // Add user message to thread
-      await this.addMessage(message);
+      // Ensure system prompt is set
+      if (this.conversationHistory.length === 0) {
+        this.conversationHistory.push({
+          role: 'system',
+          content: this.systemPrompt || 'You are a helpful AI assistant. Always respond in Russian language.'
+        });
+      }
 
-      // Create and run the assistant
-      const run = await this.createRun();
-
-      // Poll until run completes
-      await this.pollRunStatus(run.id);
-
-      // Get the assistant's response
-      const response = await this.getLatestMessage();
-
-      // Store in history
+      // Add user message to history
       this.conversationHistory.push({
         role: 'user',
         content: message
       });
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: response
+
+      // Make API request
+      const response = await fetch(OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: this.conversationHistory,
+          temperature: 0.7,
+          max_tokens: 800,
+          top_p: 1,
+          frequency_penalty: 0,
+          presence_penalty: 0
+        })
       });
 
-      return response;
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('OpenAI API Error:', error);
+        throw new Error(error.error?.message || 'API request failed');
+      }
+
+      const data = await response.json();
+      const aiResponse = data.choices[0]?.message?.content || 'Извините, я не смог обработать ваш запрос.';
+
+      // Add AI response to history
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: aiResponse
+      });
+
+      return aiResponse;
 
     } catch (error) {
-      console.error('OpenAI Assistant Error:', error);
+      console.error('OpenAI Service Error:', error);
 
       // Return user-friendly error messages in Russian
       if (error.message.includes('API key') || error.message.includes('Incorrect API key')) {
@@ -281,20 +122,27 @@ class OpenAIAssistantService {
         return 'Ошибка: превышен лимит API. Пожалуйста, проверьте ваш аккаунт OpenAI.';
       } else if (error.message.includes('timeout')) {
         return 'Ошибка: превышено время ожидания ответа. Попробуйте еще раз.';
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+      } else if (error.message.includes('Failed to fetch') || error.message.includes('network')) {
         return 'Ошибка сети: проверьте подключение к интернету.';
+      } else if (error.message.includes('model') || error.message.includes('gpt-4o-mini')) {
+        return 'Ошибка: модель GPT-4o Mini недоступна. Проверьте доступ к модели в вашем аккаунте OpenAI.';
       } else {
-        return `Извините, произошла ошибка: ${error.message}`;
+        return `Извините, произошла ошибка: ${error.message}. Пожалуйста, попробуйте снова.`;
       }
     }
   }
 
   /**
-   * Clear conversation (create new thread)
+   * Clear conversation history and reset
    */
-  async clearConversation() {
+  clearConversation() {
     this.conversationHistory = [];
-    await this.createThread();
+    if (this.systemPrompt) {
+      this.conversationHistory.push({
+        role: 'system',
+        content: this.systemPrompt
+      });
+    }
   }
 
   /**
@@ -306,14 +154,22 @@ class OpenAIAssistantService {
   }
 
   /**
-   * Get current thread ID
-   * @returns {string} - Thread ID
+   * Set a different model
+   * @param {string} modelName - Model name (e.g., 'gpt-4', 'gpt-4o-mini', 'gpt-3.5-turbo')
    */
-  getThreadId() {
-    return this.threadId;
+  setModel(modelName) {
+    this.model = modelName;
+  }
+
+  /**
+   * Get current model
+   * @returns {string} - Model name
+   */
+  getModel() {
+    return this.model;
   }
 }
 
 // Export singleton instance
-export const openAIService = new OpenAIAssistantService();
+export const openAIService = new OpenAIService();
 export default openAIService;
